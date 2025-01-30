@@ -1,7 +1,7 @@
-#include <M5CoreS3.h>
+
+#include "M5Module_GNSS.h"
+#include <M5Unified.h>
 #include "MadgwickAHRS.h"
-#include <BMI270.h>
-#include <Wire.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <freertos/FreeRTOS.h>
@@ -15,6 +15,7 @@ const char* password = "REDACTED_PASSWORD";
 WiFiUDP udp;
 const char* udpAddress = "255.255.255.255"; // Broadcast address
 const int udpPort = 2002;
+
 
 // BMI270 object
 BMI270::BMI270 bmi270;
@@ -245,11 +246,12 @@ void UDPTask(void* pvParameters) {
 /***********************************************************************
  * @brief  Updates the M5Stack LCD screen.
  ***********************************************************************/
+
 void DisplayTask(void* pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     unsigned long displayTaskLoopCount = 0;
     unsigned long lastFrequencyUpdate = millis();
-
+    
     while (true) {
         M5.Lcd.fillScreen(TFT_BLACK);
         M5.Lcd.setCursor(0, 0);
@@ -270,13 +272,13 @@ void DisplayTask(void* pvParameters) {
 
         // UDP Status
         M5.Lcd.setTextColor(UDP_OK ? TFT_GREEN : TFT_RED);
-        M5.Lcd.printf("UDP : %s (%.0f Hz)\n", UDP_OK ? "OK" : "NOK", udpFrequency);
+        M5.Lcd.printf("NMEA: %s (%.0f Hz)\n", UDP_OK ? "OK" : "NOK", udpFrequency);
 
         M5.Lcd.setCursor(0, 150); 
         M5.Lcd.setTextColor(TFT_WHITE);
         M5.Lcd.print("<-FWD ");   
         M5.Lcd.println("^STB"); 
-        
+       
         displayTaskLoopCount++;
         if (millis() - lastFrequencyUpdate >= 1000) {
             displayFrequency = displayTaskLoopCount;
@@ -284,40 +286,51 @@ void DisplayTask(void* pvParameters) {
             lastFrequencyUpdate = millis();
         }
 
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(1000)); // 1 second cycle
+        // Delay inside the loop to let other tasks run and reset the watchdog
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(1000));
     }
 }
-
-bool reinitializeI2CAndSensor() {
-    Wire.end(); // Stop the I2C bus
-    delay(100); // Short delay to ensure the bus is idle
-    Wire.begin(); // Restart the I2C bus
-    Wire.setClock(400000); // Reconfigure clock speed to 400kHz
+//bool reinitializeI2CAndSensor() {
+//    Wire.end(); // Stop the I2C bus
+//    delay(100); // Short delay to ensure the bus is idle
+//    Wire.begin(); // Restart the I2C bus
+//    Wire.setClock(400000); // Reconfigure clock speed to 400kHz
     
     // Reinitialize the BMI270 sensor
-    if (bmi270.init(I2C_NUM_1, BMI270_SENSOR_ADDR)) {
-        IMU_OK = true;
-        return true;
-    } else {
-        IMU_OK = false;
-        return false;
-    }
-}
+//    if (bmi270.init(I2C_NUM_1, BMI270_SENSOR_ADDR)) {
+//        IMU_OK = true;
+//        return true;
+//    } else {
+//        IMU_OK = false;
+//        return false;
+//    }
+//}
 
 /***********************************************************************
  * @brief  Initializes the system.
  ***********************************************************************/
 void setup() {
-    M5.begin();
-    M5.Lcd.setBrightness(200);
+    
+    auto cfg = M5.config();
+    cfg.clear_display = true;
+    cfg.external_imu = true;
+    M5.begin(cfg);
+
+
+
 
     Serial.begin(115200);
     Serial2.begin(38400, SERIAL_8N1, 18, 17);
     WiFi.begin(ssid, password);
-    reinitializeI2CAndSensor();
+
+    if (bmi270.init(I2C_NUM_1, BMI270_SENSOR_ADDR)) {
+        IMU_OK = true;
+    } else {
+        IMU_OK = false;
+    }
 
     filter.begin(200.0f);
-
+ 
     gpsMutex = xSemaphoreCreateMutex();
 
     xTaskCreate(IMUTask, "IMU Task", 4096, NULL, 2, &IMUTaskHandle);
