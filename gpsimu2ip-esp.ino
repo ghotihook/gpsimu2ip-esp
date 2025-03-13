@@ -8,8 +8,8 @@
 #include <freertos/semphr.h>
 
 // Wi-Fi credentials
-const char* ssid = "REDACTED_SSID";
-const char* password = "REDACTED_PASSWORD";
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
 
 // UDP Configuration
 WiFiUDP udp;
