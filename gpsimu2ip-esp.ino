@@ -82,7 +82,7 @@ String makePitchXDR(float pitch) {
  ***********************************************************************/
 void IMUTask(void* pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();
-    const int NUM_SAMPLES = 20; // Rolling window size
+    const int NUM_SAMPLES = 10; // Rolling window size
     static float axBuffer[NUM_SAMPLES] = {0};
     static float ayBuffer[NUM_SAMPLES] = {0};
     static float azBuffer[NUM_SAMPLES] = {0};
@@ -242,7 +242,7 @@ void GPSTask(void* pvParameters) {
             lastFrequencyUpdate = millis();
         }
 
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(200)); // 200 ms cycle
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(50)); // 200 ms cycle
     }
 }
 /***********************************************************************
@@ -290,7 +290,7 @@ void UDPTask(void* pvParameters) {
             lastFrequencyUpdate = millis();
         }
 
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(200)); // 200 ms cycle
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(100)); // 200 ms cycle
     }
 }
 
