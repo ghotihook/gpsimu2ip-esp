@@ -1,4 +1,5 @@
 
+#include <Wire.h>
 #include "M5Module_GNSS.h"
 #include <M5Unified.h>
 #include "MadgwickAHRS.h"
@@ -6,10 +7,7 @@
 #include <WiFiUdp.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
-
-// Wi-Fi credentials
-const char* ssid = "SSID";
-const char* password = "PASSWORD";
+#include "secrets.h"
 
 // UDP Configuration
 WiFiUDP udp;
@@ -19,7 +17,7 @@ const int udpPort = 2002;
 
 // BMI270 object
 BMI270::BMI270 bmi270;
-#define BMI270_SENSOR_ADDR 0x69
+#define BMI270_SENSOR_ADDR 0x68
 
 // Madgwick filter
 Madgwick filter;
@@ -315,13 +313,15 @@ void setup() {
     cfg.clear_display = true;
     cfg.external_imu = true;
     M5.begin(cfg);
+    M5.Lcd.setTextSize(2);
 
-
+    Wire.begin();
+    Wire.setClock(1000000); // Try 1 MHz, if supported by sensor
 
 
     Serial.begin(115200);
     Serial2.begin(38400, SERIAL_8N1, 18, 17);
-    WiFi.begin(ssid, password);
+    connect_to_wifi();
 
     if (bmi270.init(I2C_NUM_1, BMI270_SENSOR_ADDR)) {
         IMU_OK = true;
@@ -329,7 +329,7 @@ void setup() {
         IMU_OK = false;
     }
 
-    filter.begin(200.0f);
+    filter.begin(100.0f);
  
     gpsMutex = xSemaphoreCreateMutex();
 
@@ -338,6 +338,31 @@ void setup() {
     xTaskCreate(UDPTask, "UDP Task", 4096, NULL, 1, &UDPTaskHandle);
     xTaskCreate(DisplayTask, "Display Task", 4096, NULL, 1, &DisplayTaskHandle);
 }
+
+void connect_to_wifi() {
+    WiFi.mode(WIFI_STA);  
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.setSleep(false);
+    WiFi.setAutoReconnect(true);
+
+    int dots = 0;
+    while (WiFi.status() != WL_CONNECTED) {
+        dots = (dots + 1) % 4;
+        String wifiStatus = "Connecting to WiFi";
+        wifiStatus += (dots == 0 ? "" : (dots == 1 ? "." : (dots == 2 ? ".." : "...")));
+        M5.Lcd.setCursor(10, 10);
+        M5.Lcd.setTextColor(WHITE);
+        M5.Lcd.print(wifiStatus);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        M5.Lcd.setCursor(10, 10);
+        M5.Lcd.setTextColor(BLACK);
+        M5.Lcd.print(wifiStatus);      
+    }
+}
+
+
+
+
 
 void loop() {
     // FreeRTOS handles tasks
