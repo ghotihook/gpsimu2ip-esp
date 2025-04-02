@@ -143,6 +143,7 @@ void IMUTask(void* pvParameters) {
 /***********************************************************************
  * @brief  Reads NMEA messages from the GPS module.
  ***********************************************************************/
+/*
 void GPSTask(void* pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     unsigned long gpsTaskLoopCount = 0;
@@ -191,7 +192,59 @@ void GPSTask(void* pvParameters) {
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(200)); // 20 ms cycle
     }
 }
+*/
+void GPSTask(void* pvParameters) {
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    unsigned long gpsTaskLoopCount = 0;
+    unsigned long lastFrequencyUpdate = millis();
 
+    while (true) {
+        static String nmeaMessage = "";
+        static bool messageStarted = false;
+
+        while (Serial2.available() > 0) {
+            char c = Serial2.read();
+
+            if (!messageStarted && c == '$') {
+                messageStarted = true;
+                nmeaMessage = c;
+            } else if (messageStarted) {
+                nmeaMessage += c;
+                if (c == '\n') {
+                    messageStarted = false;
+                    
+                    // Only process the message if its length is sufficient and it starts with "$GNRMC"
+                    if (nmeaMessage.length() > 20 && nmeaMessage.startsWith("$GNRMC")) {
+                        xSemaphoreTake(gpsMutex, portMAX_DELAY);
+                        latestGPSMessage = nmeaMessage;
+                        xSemaphoreGive(gpsMutex);
+                        GPS_OK = true;
+                        lastGPSUpdate = millis();
+                    } else {
+                        GPS_OK = false;
+                    }
+                    
+                    // Clear the message for the next sentence.
+                    nmeaMessage = "";
+                    break;
+                }
+            }
+        }
+
+        if (millis() - lastGPSUpdate > 1000) {
+            GPS_OK = false;
+        }
+
+        gpsTaskLoopCount++;
+        if (millis() - lastFrequencyUpdate >= 1000) {
+            gpsFrequency = gpsTaskLoopCount;
+            gpsTaskLoopCount = 0;
+            lastFrequencyUpdate = millis();
+        }
+
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(200)); // 200 ms cycle
+    }
+}
 /***********************************************************************
  * @brief  Sends IMU and GPS data via UDP.
  ***********************************************************************/
