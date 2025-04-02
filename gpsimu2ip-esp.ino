@@ -19,8 +19,7 @@ const int udpPort = 2002;
 BMI270::BMI270 bmi270;
 #define BMI270_SENSOR_ADDR 0x68
 
-// Madgwick filter
-Madgwick filter;
+
 
 // Status flags
 bool GPS_OK = false;
@@ -35,6 +34,13 @@ float pitchOffset = 0;
 // Shared GPS data
 String latestGPSMessage = "";
 SemaphoreHandle_t gpsMutex;
+
+
+// Global averaged pitch/roll values
+float globalAvgPitch = 0.0;
+float globalAvgRoll  = 0.0;
+SemaphoreHandle_t imuDataMutex;
+
 
 // Data freshness tracking
 unsigned long lastGPSUpdate = 0;
@@ -81,52 +87,65 @@ String makePitchXDR(float pitch) {
  * @brief  Reads IMU data and updates the Madgwick filter.
  ***********************************************************************/
 void IMUTask(void* pvParameters) {
-    TickType_t lastWakeTime = xTaskGetTickCount();
-    const int NUM_SAMPLES = 10; // Rolling window size
-    static float axBuffer[NUM_SAMPLES] = {0};
-    static float ayBuffer[NUM_SAMPLES] = {0};
-    static float azBuffer[NUM_SAMPLES] = {0};
-    static float gxBuffer[NUM_SAMPLES] = {0};
-    static float gyBuffer[NUM_SAMPLES] = {0};
-    static float gzBuffer[NUM_SAMPLES] = {0};
+    // Create a local instance of the filter
+    Madgwick localFilter;
+    localFilter.begin(100.0f);
+
+    // Rolling buffers for pitch and roll averaging
+    const int NUM_AVG_SAMPLES = 5;
+    static float pitchBuffer[NUM_AVG_SAMPLES] = {0};
+    static float rollBuffer[NUM_AVG_SAMPLES] = {0};
     static int bufferIndex = 0;
 
     unsigned long imuTaskLoopCount = 0;
     unsigned long lastFrequencyUpdate = millis();
+    TickType_t lastWakeTime = xTaskGetTickCount();
 
     while (true) {
         float ax, ay, az, gx, gy, gz;
 
+        // Read sensor values directly from the BMI270
         IMU_OK = (bmi270.readAcceleration(ax, ay, az) == 1);
         IMU_OK = (bmi270.readGyroscope(gx, gy, gz) == 1);
 
         if (IMU_OK) {
-            ax = ax; // X-axis unchanged
-            ay = -ay; // Invert Y-axis
-            az = -az; // Invert Z-axis
-            gx = gx; // X-axis unchanged
-            gy = -gy; // Invert Y-axis
-            gz = -gz; // Invert Z-axis
+            // Adjust axis values if necessary
+            ax = ax;            // X-axis unchanged
+            ay = -ay;           // Invert Y-axis
+            az = -az;           // Invert Z-axis
+            gx = gx;            // X-axis unchanged
+            gy = -gy;           // Invert Y-axis
+            gz = -gz;           // Invert Z-axis
 
-            axBuffer[bufferIndex] = ax; ayBuffer[bufferIndex] = ay; azBuffer[bufferIndex] = az;
-            gxBuffer[bufferIndex] = gx; gyBuffer[bufferIndex] = gy; gzBuffer[bufferIndex] = gz;
+            // Update the filter with the raw sensor data
+            localFilter.updateIMU(gx, gy, gz, ax, ay, az);
 
-            bufferIndex = (bufferIndex + 1) % NUM_SAMPLES;
+            // Retrieve filtered pitch and roll (apply any offsets if needed)
+            float currentRoll  = localFilter.getRoll() + rollOffset;
+            float currentPitch = -localFilter.getPitch() + pitchOffset;
 
-            float axAvg = 0, ayAvg = 0, azAvg = 0;
-            float gxAvg = 0, gyAvg = 0, gzAvg = 0;
+            // Add the filtered values to the rolling buffer
+            pitchBuffer[bufferIndex] = currentPitch;
+            rollBuffer[bufferIndex]  = currentRoll;
 
-            for (int i = 0; i < NUM_SAMPLES; i++) {
-                axAvg += axBuffer[i]; ayAvg += ayBuffer[i]; azAvg += azBuffer[i];
-                gxAvg += gxBuffer[i]; gyAvg += gyBuffer[i]; gzAvg += gzBuffer[i];
+            // Compute rolling averages for pitch and roll
+            float sumPitch = 0, sumRoll = 0;
+            for (int i = 0; i < NUM_AVG_SAMPLES; i++) {
+                sumPitch += pitchBuffer[i];
+                sumRoll  += rollBuffer[i];
             }
+            float avgPitch = sumPitch / NUM_AVG_SAMPLES;
+            float avgRoll  = sumRoll / NUM_AVG_SAMPLES;
 
-            axAvg /= NUM_SAMPLES; ayAvg /= NUM_SAMPLES; azAvg /= NUM_SAMPLES;
-            gxAvg /= NUM_SAMPLES; gyAvg /= NUM_SAMPLES; gzAvg /= NUM_SAMPLES;
-
-            filter.updateIMU(gxAvg, gyAvg, gzAvg, axAvg, ayAvg, azAvg);
+            // Update the global averaged values safely
+            xSemaphoreTake(imuDataMutex, portMAX_DELAY);
+            globalAvgPitch = avgPitch;
+            globalAvgRoll  = avgRoll;
+            xSemaphoreGive(imuDataMutex);
 
             lastIMUUpdate = millis();
+            // Move to the next index in the rolling buffer
+            bufferIndex = (bufferIndex + 1) % NUM_AVG_SAMPLES;
         }
 
         imuTaskLoopCount++;
@@ -254,22 +273,27 @@ void UDPTask(void* pvParameters) {
     unsigned long lastFrequencyUpdate = millis();
 
     while (true) {
-        float heel = 0, pitch = 0;
+        float pitch = 0, heel = 0;
         String gpsRMC = "";
 
+        // If the IMU data is fresh, retrieve the rolling average values safely
         if (millis() - lastIMUUpdate <= 500) {
-            heel = filter.getRoll() + rollOffset;
-            pitch = -filter.getPitch() + pitchOffset;
+            xSemaphoreTake(imuDataMutex, portMAX_DELAY);
+            pitch = globalAvgPitch;
+            heel  = globalAvgRoll;
+            xSemaphoreGive(imuDataMutex);
         }
 
+        // Get the latest GPS message (with the existing GPS mutex)
         xSemaphoreTake(gpsMutex, portMAX_DELAY);
         if (millis() - lastGPSUpdate <= 500) {
             gpsRMC = latestGPSMessage;
         }
         xSemaphoreGive(gpsMutex);
 
+        // Create NMEA sentences using the averaged values
         String pitchXDR = makePitchXDR(pitch);
-        String heelXDR = makeHeelXDR(heel);
+        String heelXDR  = makeHeelXDR(heel);
         
         udp.beginPacket(udpAddress, udpPort);
         udp.print(pitchXDR);
@@ -290,7 +314,7 @@ void UDPTask(void* pvParameters) {
             lastFrequencyUpdate = millis();
         }
 
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(100)); // 200 ms cycle
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(100)); // 100 ms cycle
     }
 }
 
@@ -368,8 +392,8 @@ void setup() {
     M5.begin(cfg);
     M5.Lcd.setTextSize(2);
 
-    Wire.begin();
-    Wire.setClock(1000000); // Try 1 MHz, if supported by sensor
+    //Wire.begin();
+    //Wire.setClock(1000000); // Try 1 MHz, if supported by sensor
 
 
     Serial.begin(115200);
@@ -382,9 +406,10 @@ void setup() {
         IMU_OK = false;
     }
 
-    filter.begin(100.0f);
- 
+
     gpsMutex = xSemaphoreCreateMutex();
+    imuDataMutex = xSemaphoreCreateMutex(); 
+
 
     xTaskCreate(IMUTask, "IMU Task", 4096, NULL, 2, &IMUTaskHandle);
     xTaskCreate(GPSTask, "GPS Task", 4096, NULL, 2, &GPSTaskHandle);
