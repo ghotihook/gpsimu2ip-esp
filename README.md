@@ -25,7 +25,7 @@ $IIXDR,A,20,D,HEEL*7D
 ```
 
 # GPS configuration
-By default the NEO-M9N ublox GPS chip in the GNSS module operates at 1hz and outputs lots of additional messages. in the tools directory use the 'serialpassthrough' to configure the M5 Stack to pass any data from the internal UART (GPS) to the external UART (USB Port). Once compriled and uploaded, you can then simply connect the module to a computer and using u-center configure the GPS module using the GUI. I have configured 5hz updates and removed all messages from NMEA except for RMC. 
+By default the NEO-M9N ublox GPS chip in the GNSS module operates at 1hz and outputs lots of additional messages. in the tools directory use the 'serialpassthrough' to configure the M5 Stack to pass any data from the internal UART (GPS) to the external UART (USB Port). Once compiled and uploaded, you can then simply connect the module to a computer (windows) and using u-center configure the GPS module using the GUI. I have configured 20hz updates and removed all messages from NMEA except for RMC. 
 
 
 # Installation
@@ -67,6 +67,10 @@ then tweak the paramaters, easiest done in the BMI270.cpp file although the defa
         sens_cfg[1].cfg.gyr.range = BMI2_GYR_RANGE_2000;
         sens_cfg[1].cfg.gyr.ois_range = BMI2_GYR_OIS_2000;
 ```
+
+finally, the recent 3.2 ESP BSP update via ardino has broken a number of libraries that use the legacy i2c driver. Using the 3.1.3 version keeps everyting working for now.
+
+
 
 # ToDo
 - Code should self-configure the GPS unit to desired output
