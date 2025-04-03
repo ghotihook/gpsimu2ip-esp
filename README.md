@@ -1,17 +1,17 @@
 # gpsimu2ip
-uses an M5 Stack ESP32 controller and GNSS module to provide GPS (RMC), Heel and Pitch data via NMEA over UDP. 
+Uses an M5 Stack ESP32 controller and GNSS module to provide GPS (RMC), Heel and Pitch data via NMEA over UDP. 
 
 ![Unit](images/unit.jpeg)
 
 **Initial configuration is**
-- GPS output at 20hz
-- IMU internal refresh (100hz)
-- UDP output at 10hz
-- Display update 1hz
+- GPS measurement (20hz)
+- IMU measurement and processing (100hz)
+- UDP/NMEA output (10hz)
+- Display update (1hz)
 
 
 
-# parts
+# Parts
 [M5 Stack Core S3 SE](https://shop.m5stack.com/products/m5stack-cores3-esp32s3-lotdevelopment-kit?srsltid=AfmBOooBjrRcmQfX4Ls7f4-QoIkYDgNVxXmuVoQinpfh3KtxQ-GVJX3A)
 
 [GNSS Module with IMU](https://shop.m5stack.com/products/gnss-module-with-barometric-pressure-imu-magnetometer-sensors?srsltid=AfmBOorUYsZstzVM0wU1aUoTbz5d52dBKPwS9WHpqgLIYkI7fgVtVrVr)
