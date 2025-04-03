@@ -29,7 +29,7 @@ By default the NEO-M9N ublox GPS chip in the GNSS module operates at 1hz and out
 
 
 # Installation
-rename the secrets_template.h to secrets.h and configure with your wifi SSID and Username
+Rename the secrets_template.h to secrets.h and configure with your wifi SSID and Username
 
 Use the Arduino IDE and install the library install M5Module_GNSS library (which contains the bosch BMI270 driver). I am not sure why this is required but it works.
 
