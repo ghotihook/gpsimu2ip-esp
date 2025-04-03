@@ -4,9 +4,9 @@ uses an M5 Stack ESP32 controller and GNSS module to provide GPS (RMC), Heel and
 ![Unit](images/unit.jpeg)
 
 **Initial configuration is**
-- GPS output at 5hz
+- GPS output at 20hz
 - IMU internal refresh (100hz)
-- UDP output at 5hz
+- UDP output at 10hz
 - Display update 1hz
 
 
