@@ -19,7 +19,7 @@ Uses an M5 Stack ESP32 controller and GNSS module to provide GPS (RMC), Heel and
 
 # Example output
 ```
-$GNRMC,203043.00,A,3251.73631,S,15220.32322,E,0.938,,240125,,,A,V*0B
+$GNRMC,203043.00,A,3851.73631,S,15720.32322,E,0.938,,240125,,,A,V*0B
 $IIXDR,A,-1,D,PITCH*10
 $IIXDR,A,20,D,HEEL*7D
 ```
