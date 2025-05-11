@@ -15,9 +15,9 @@ const char* udpAddress = "255.255.255.255"; // Broadcast address
 const int udpPort = 2002;
 
 
-// BMI270 object
+// BMI270 object - Either 0x68 or 0x69
 BMI270::BMI270 bmi270;
-#define BMI270_SENSOR_ADDR 0x68
+#define BMI270_SENSOR_ADDR 0x69
 
 
 
