@@ -16,7 +16,8 @@ const int   udpPort    = 2002;
 
 // SparkFun BMI270 object
 BMI270 imu;
-uint8_t i2cAddress = BMI2_I2C_SEC_ADDR;    // 0x69 on your board
+uint8_t i2cAddress = BMI2_I2C_PRIM_ADDR;    // 0x68
+//uint8_t i2cAddress = BMI2_I2C_SEC_ADDR;    // 0x69
 
 // Madgwick filter
 Madgwick filter;
@@ -57,7 +58,7 @@ TaskHandle_t IMUTaskHandle,
 String makeHeelXDR(float heel) {
     char xdr[100];
     uint8_t cs = 0;
-    snprintf(xdr, sizeof(xdr), "IIXDR,A,%.0f,D,HEEL", heel);
+    snprintf(xdr, sizeof(xdr), "IIXDR,A,%.0f,D,M5_HEEL", heel);
     for (int i = 0; xdr[i]; i++) cs ^= xdr[i];
     char out[110];
     snprintf(out, sizeof(out), "$%s*%02X\n", xdr, cs);
@@ -70,7 +71,7 @@ String makeHeelXDR(float heel) {
 String makePitchXDR(float pitch) {
     char xdr[100];
     uint8_t cs = 0;
-    snprintf(xdr, sizeof(xdr), "IIXDR,A,%.0f,D,PITCH", pitch);
+    snprintf(xdr, sizeof(xdr), "IIXDR,A,%.0f,D,M5_PITCH", pitch);
     for (int i = 0; xdr[i]; i++) cs ^= xdr[i];
     char out[110];
     snprintf(out, sizeof(out), "$%s*%02X\n", xdr, cs);
@@ -294,6 +295,7 @@ void connect_to_wifi() {
                                                dots == 2 ? ".." : "..."));
         vTaskDelay(pdMS_TO_TICKS(500));
     }
+    Serial.println("Wifi Connected");
 }
 
 void setup() {
@@ -307,8 +309,8 @@ void setup() {
     // 2) Initialize Serial + I2C + Wi-Fi
     Serial.begin(115200);
     while (!Serial);
-    Wire.begin();
-    Wire.setClock(1000000);
+    Wire.begin(12, 11);
+    Wire.setClock(400000);     // 400 kHz is plenty for BMI270
 
     connect_to_wifi();
     Serial.print("Init BMI270 @0x");
