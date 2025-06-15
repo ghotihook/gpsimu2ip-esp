@@ -308,7 +308,8 @@ void setup() {
 
     // 2) Initialize Serial + I2C + Wi-Fi
     Serial.begin(115200);
-    while (!Serial);
+    //while (!Serial);
+    delay(500);
     Wire.begin(12, 11);
     Wire.setClock(400000);     // 400 kHz is plenty for BMI270
 
