@@ -33,7 +33,7 @@ float rollOffset  = 0;
 float pitchOffset = 0;
 
 // Shared GPS data
-String latestGPSMessage;
+char latestGPSMessage[128];
 SemaphoreHandle_t gpsMutex;
 
 // Data freshness tracking
@@ -144,28 +144,31 @@ void GPSTask(void* pvParameters) {
                   lastFreqTimestamp = millis();
 
     while (true) {
-        static String buf;
-        static bool   inMsg = false;
+        static char buf[128];
+        static int  bufIdx = 0;
+        static bool inMsg  = false;
 
         while (Serial2.available()) {
             char c = Serial2.read();
             if (!inMsg && c == '$') {
-                inMsg = true;
-                buf = c;
+                inMsg  = true;
+                bufIdx = 0;
+                buf[bufIdx++] = c;
             } else if (inMsg) {
-                buf += c;
+                if (bufIdx < (int)sizeof(buf) - 1)
+                    buf[bufIdx++] = c;
                 if (c == '\n') {
+                    buf[bufIdx] = '\0';
                     inMsg = false;
-                    if (buf.startsWith("$GNRMC") && buf.length() > 20) {
+                    if (strncmp(buf, "$GNRMC", 6) == 0 && bufIdx > 20) {
                         xSemaphoreTake(gpsMutex, portMAX_DELAY);
-                        latestGPSMessage = buf;
+                        strncpy(latestGPSMessage, buf, sizeof(latestGPSMessage) - 1);
+                        latestGPSMessage[sizeof(latestGPSMessage) - 1] = '\0';
                         xSemaphoreGive(gpsMutex);
                         GPS_OK = true;
                         lastGPSUpdate = millis();
-                    } else {
-                        GPS_OK = false;
                     }
-                    buf = "";
+                    bufIdx = 0;
                     break;
                 }
             }
@@ -193,13 +196,13 @@ void UDPTask(void* pvParameters) {
                   lastFreqTimestamp = millis();
 
     while (true) {
-        float    heel = filter.getRoll() + rollOffset;
-        float   pitch = -filter.getPitch() + pitchOffset;
-        String gpsRMC;
+        float heel  = filter.getRoll() + rollOffset;
+        float pitch = -filter.getPitch() + pitchOffset;
+        char gpsRMC[128] = {0};
 
         if (millis() - lastGPSUpdate <= 500) {
             xSemaphoreTake(gpsMutex, portMAX_DELAY);
-            gpsRMC = latestGPSMessage;
+            strncpy(gpsRMC, latestGPSMessage, sizeof(gpsRMC) - 1);
             xSemaphoreGive(gpsMutex);
         }
 
@@ -334,10 +337,10 @@ void setup() {
     gpsMutex = xSemaphoreCreateMutex();
 
     // 6) Spawn tasks
-    xTaskCreate(IMUTask,    "IMU Task",     4096, NULL, 2, &IMUTaskHandle);
-    xTaskCreate(GPSTask,    "GPS Task",     4096, NULL, 2, &GPSTaskHandle);
-    xTaskCreate(UDPTask,    "UDP Task",     4096, NULL, 1, &UDPTaskHandle);
-    xTaskCreate(DisplayTask,"Display Task", 4096, NULL, 1, &DisplayTaskHandle);
+    xTaskCreate(IMUTask,    "IMU Task",     8192, NULL, 2, &IMUTaskHandle);
+    xTaskCreate(GPSTask,    "GPS Task",     8192, NULL, 2, &GPSTaskHandle);
+    xTaskCreate(UDPTask,    "UDP Task",     8192, NULL, 1, &UDPTaskHandle);
+    xTaskCreate(DisplayTask,"Display Task", 8192, NULL, 1, &DisplayTaskHandle);
 }
 
 void loop() {
