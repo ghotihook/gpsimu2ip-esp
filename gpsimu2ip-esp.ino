@@ -33,7 +33,7 @@ float rollOffset  = 0;
 float pitchOffset = 0;
 
 // Shared GPS data
-char latestGPSMessage[128];
+char latestGPSMessage[256];
 SemaphoreHandle_t gpsMutex;
 
 // Data freshness tracking
@@ -144,7 +144,7 @@ void GPSTask(void* pvParameters) {
                   lastFreqTimestamp = millis();
 
     while (true) {
-        static char buf[128];
+        static char buf[256];
         static int  bufIdx = 0;
         static bool inMsg  = false;
 
@@ -198,7 +198,7 @@ void UDPTask(void* pvParameters) {
     while (true) {
         float heel  = filter.getRoll() + rollOffset;
         float pitch = -filter.getPitch() + pitchOffset;
-        char gpsRMC[128] = {0};
+        char gpsRMC[256] = {0};
 
         if (millis() - lastGPSUpdate <= 500) {
             xSemaphoreTake(gpsMutex, portMAX_DELAY);
@@ -298,7 +298,9 @@ void connect_to_wifi() {
                                                dots == 2 ? ".." : "..."));
         vTaskDelay(pdMS_TO_TICKS(500));
     }
+#ifdef DEBUG
     Serial.println("Wifi Connected");
+#endif
 }
 
 void setup() {
@@ -310,21 +312,28 @@ void setup() {
     M5.Lcd.setTextSize(2);
 
     // 2) Initialize Serial + I2C + Wi-Fi
+#ifdef DEBUG
     Serial.begin(115200);
-    //while (!Serial);
     delay(500);
+#endif
     Wire.begin(12, 11);
     Wire.setClock(400000);     // 400 kHz is plenty for BMI270
 
     connect_to_wifi();
+#ifdef DEBUG
     Serial.print("Init BMI270 @0x");
     Serial.print(i2cAddress, HEX);
     Serial.print(" ...");
+#endif
     while (imu.beginI2C(i2cAddress) != BMI2_OK) {
+#ifdef DEBUG
       Serial.print('.');
+#endif
       delay(500);
     }
+#ifdef DEBUG
     Serial.println(" OK!");
+#endif
     IMU_OK = true;
 
     // 3) Start Madgwick
