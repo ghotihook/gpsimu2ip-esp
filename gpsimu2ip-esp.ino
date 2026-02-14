@@ -58,7 +58,7 @@ TaskHandle_t IMUTaskHandle,
 String makeHeelXDR(float heel) {
     char xdr[100];
     uint8_t cs = 0;
-    snprintf(xdr, sizeof(xdr), "IIXDR,A,%.0f,D,M5_HEEL", heel);
+    snprintf(xdr, sizeof(xdr), "MFXDR,A,%.0f,D,M5_HEEL", heel);
     for (int i = 0; xdr[i]; i++) cs ^= xdr[i];
     char out[110];
     snprintf(out, sizeof(out), "$%s*%02X\n", xdr, cs);
@@ -71,7 +71,7 @@ String makeHeelXDR(float heel) {
 String makePitchXDR(float pitch) {
     char xdr[100];
     uint8_t cs = 0;
-    snprintf(xdr, sizeof(xdr), "IIXDR,A,%.0f,D,M5_PITCH", pitch);
+    snprintf(xdr, sizeof(xdr), "MFXDR,A,%.0f,D,M5_PITCH", pitch);
     for (int i = 0; xdr[i]; i++) cs ^= xdr[i];
     char out[110];
     snprintf(out, sizeof(out), "$%s*%02X\n", xdr, cs);
